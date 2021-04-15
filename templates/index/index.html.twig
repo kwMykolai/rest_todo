@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ToDo app</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        body {
+            padding-top: 56px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <div class="container">
+        <a class="navbar-brand" href="#">TODO</a>
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="#">Home
+                    <span class="sr-only">(current)</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+<div class="container">
+    <div class="row align-items-center my-5">
+        <div class="col-lg-12">
+            <div ng-app="ToDo">
+                <div class="row" ng-view>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<footer class="py-5 bg-dark">
+    <div class="container">
+        <p class="m-0 text-center text-white">Copyright &copy; 2021</p>
+    </div>
+</footer>
+<script src="/js/app.js"></script>
+<script>
+    const app = angular.module("ToDo", ["ngRoute"]);
+    app.config(function($routeProvider) {
+        $routeProvider.when('/', {
+            templateUrl:'view/list.html',
+            controller:'ToDoController'
+        }).when('/lists/:listId', {
+            templateUrl:'view/list-details.html',
+            controller:'ListController'
+        }).otherwise('/');
+    });
+    app.controller('ToDoController', ["$scope", function($scope){
+        $scope.todoLists = [];
+        $scope.newList = null;
+        $scope.query = "";
+        $scope.fetchToDos = function(query){
+            let uri = `/api/v1/lists`;
+            if (query) {
+                uri += "?query=" + query
+            }
+            axios.get(uri).then(function(response){
+                $scope.todoLists = response.data.map((e)=>{
+                    e.newEntry = {
+                        title: ""
+                    };
+                    return e;
+                });
+                $scope.$apply();
+            });
+        };
+        $scope.search = function() {
+            $scope.fetchToDos($scope.query);
+        };
+        $scope.deleteList = function (list) {
+            axios.delete(`/api/v1/lists/${list.id}`).then(function(response){
+                $scope.todoLists = $scope.todoLists.filter(e => e.id !== list.id);
+                $scope.$apply();
+            });
+        };
+        $scope.createNewList = function (){
+            $scope.newList = {
+                title: ""
+            };
+            $scope.$apply();
+        };
+        $scope.createList = function (){
+            axios.post(`/api/v1/lists`, $scope.newList).then(function(response){
+                $scope.todoLists.push(response.data);
+                $scope.newList = null;
+                $scope.$apply();
+            });
+        };
+        $scope.fetchToDos();
+    }]);
+    app.controller('ListController', ["$scope", "$routeParams", function($scope, $routeParams){
+        $scope.newEntry = "";
+        $scope.list = {
+            id: $routeParams.listId
+        };
+        $scope.addListEntry = function() {
+            axios.post(`/api/v1/lists/${$scope.list.id}/entries`, {
+                title: $scope.newEntry
+            }).then(function(response){
+                $scope.list.entries.push(response.data);
+                $scope.newEntry = "";
+                $scope.$apply();
+            });
+        };
+        $scope.removeEntry = function(entry) {
+            axios.delete(`/api/v1/lists/${$scope.list.id}/entries/${entry.id}`).then(function(response){
+                $scope.list.entries = $scope.list.entries.filter(e => e.id !== entry.id);
+                $scope.$apply();
+            });
+        };
+        axios.get(`/api/v1/lists/${$scope.list.id}`).then(function(response){
+            $scope.list = response.data;
+            $scope.$apply();
+        });
+    }]);
+</script>
+</body>
+</html>
